@@ -5,11 +5,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using Microsoft.AspNet.FeatureModel;
 using Microsoft.AspNet.Hosting.Builder;
 using Microsoft.AspNet.Hosting.Internal;
 using Microsoft.AspNet.Hosting.Server;
 using Microsoft.AspNet.Hosting.Startup;
+using Microsoft.AspNet.Http;
 using Microsoft.Framework.DependencyInjection;
+using Microsoft.Framework.Logging;
 using Microsoft.Framework.Runtime;
 using Microsoft.Framework.Runtime.Infrastructure;
 
@@ -47,14 +50,21 @@ namespace Microsoft.AspNet.Hosting
             InitalizeServerFactory(context);
             EnsureApplicationDelegate(context);
 
+            var loggerFactory = context.ApplicationServices.GetRequiredService<ILoggerFactory>();
+            var logger = loggerFactory.CreateLogger<HostingEngine>();
             var contextFactory = context.ApplicationServices.GetRequiredService<IHttpContextFactory>();
             var contextAccessor = context.ApplicationServices.GetRequiredService<IHttpContextAccessor>();
             var server = context.ServerFactory.Start(context.Server,
-                features =>
+                async features =>
                 {
-                    var httpContext = contextFactory.CreateHttpContext(features);
-                    contextAccessor.HttpContext = httpContext;
-                    return context.ApplicationDelegate(httpContext);
+                    var requestIdentifier = GetRequestIdentifier(features);
+
+                    using (logger.BeginScope(new RequestInformationValues(requestIdentifier)))
+                    {
+                        var httpContext = contextFactory.CreateHttpContext(features);
+                        contextAccessor.HttpContext = httpContext;
+                        await context.ApplicationDelegate(httpContext);
+                    }
                 });
 
             return new Disposable(() =>
@@ -63,6 +73,17 @@ namespace Microsoft.AspNet.Hosting
                 server.Dispose();
                 _appLifetime.NotifyStopped();
             });
+        }
+
+        private Guid GetRequestIdentifier(IFeatureCollection features)
+        {
+            object obj;
+            if (features.TryGetValue(typeof(IRequestIdentifierFeature), out obj))
+            {
+                return ((IRequestIdentifierFeature)obj).TraceIdentifier;
+            }
+
+            return Guid.Empty;
         }
 
         private void EnsureContextDefaults(HostingContext context)

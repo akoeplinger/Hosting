@@ -40,6 +40,7 @@ namespace Microsoft.AspNet.Hosting
 
         public HostingEngine(IServiceCollection appServices, IStartupLoader startupLoader, IConfiguration config, IHostingEnvironment hostingEnv, string appName)
         {
+            Console.WriteLine("hello");
             _config = config ?? new Configuration();
             _applicationServiceCollection = appServices;
             _startupLoader = startupLoader;

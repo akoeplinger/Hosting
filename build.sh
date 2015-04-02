@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export MONO_OPTIONS=--debug
+
 if test `uname` = Darwin; then
     cachedir=~/Library/Caches/KBuild
 else
